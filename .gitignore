@@ -1,0 +1,14 @@
+# Arquivos do Python
+__pycache__/
+*.pyc
+
+# Pastas de ambiente virtual
+venv/
+.venv/
+
+# Arquivos do PyInstaller
+build/
+*.spec
+
+# Arquivos do sistema
+.DS_Store
