@@ -59,12 +59,86 @@ def salvar_loot_geral():
     except Exception as e:
         messagebox.showerror("Erro ao Salvar", f"Não foi possível salvar as alterações no 'loot_geral.csv':\n{e}")
 
+def carregar_itens_exemplo():
+    """Adiciona itens de exemplo para demonstrar o sistema"""
+    itens_exemplo = [
+        {"nome_item": "Espada Longa", "raridade": "Comum"},
+        {"nome_item": "Escudo de Ferro", "raridade": "Comum"},
+        {"nome_item": "Adaga Afiada", "raridade": "Incomum"},
+        {"nome_item": "Armadura de Couro", "raridade": "Incomum"},
+        {"nome_item": "Elmo Mágico", "raridade": "Raro"},
+        {"nome_item": "Botas Élfica", "raridade": "Raro"},
+        {"nome_item": "Cajado Arcano", "raridade": "Épico"},
+        {"nome_item": "Colar de Proteção", "raridade": "Épico"},
+        {"nome_item": "Espada Flamejante", "raridade": "Lendário"},
+        {"nome_item": "Anel do Poder", "raridade": "Lendário"}
+    ]
+    
+    if messagebox.askyesno("Carregar Itens de Exemplo", 
+                          "Deseja carregar 10 itens de exemplo para testar o sistema?\n\n"
+                          "Isso adicionará espadas, escudos, armaduras e outros itens de várias raridades."):
+        for item in itens_exemplo:
+            # Verifica se o item já existe antes de adicionar
+            existe = any(i['nome_item'].lower() == item['nome_item'].lower() for i in LISTA_DE_LOOT_GLOBAL)
+            if not existe:
+                LISTA_DE_LOOT_GLOBAL.append(item)
+        
+        salvar_loot_geral()
+        atualizar_treeview_loot(filtro=var_filtro_itens.get())
+        messagebox.showinfo("Sucesso", f"Itens de exemplo carregados com sucesso!\nAgora você pode testar o gerador de recompensas.")
+
 def carregar_parametros(nome_arquivo):
     try:
         with open(obter_caminho(nome_arquivo), 'r', encoding='utf-8') as f:
-            return json.load(f)
+            dados = json.load(f)
+        
+        # Se o arquivo tem a nova estrutura completa
+        if "pesos_raridade" in dados:
+            pesos_raridade = dados["pesos_raridade"]
+            pesos_qualidade = dados.get("pesos_qualidade", {
+                "Condição impecável (+2)": 5,
+                "Levemente marcado (+1)": 15,
+                "Normal (+0)": 50,
+                "Bem usado (-1)": 20,
+                "Desgastado (-2)": 10
+            })
+            atributos_dinamicos = dados.get("atributos_dinamicos", {
+                "adicionar_cor": True,
+                "chance_encantamento": True,
+                "porcentagem_encantamento": 30,
+                "adicionar_qualidade": True,
+                "gerar_moedas": True
+            })
+            return pesos_raridade, pesos_qualidade, atributos_dinamicos
+        else:
+            # Compatibilidade com versão antiga
+            return dados, {
+                "Condição impecável (+2)": 5,
+                "Levemente marcado (+1)": 15,
+                "Normal (+0)": 50,
+                "Bem usado (-1)": 20,
+                "Desgastado (-2)": 10
+            }, {
+                "adicionar_cor": True,
+                "chance_encantamento": True,
+                "porcentagem_encantamento": 30,
+                "adicionar_qualidade": True,
+                "gerar_moedas": True
+            }
     except (FileNotFoundError, json.JSONDecodeError):
-        return {"Comum": 65, "Incomum": 20, "Raro": 10, "Épico": 4, "Lendário": 1}
+        return {"Comum": 65, "Incomum": 20, "Raro": 10, "Épico": 4, "Lendário": 1}, {
+            "Condição impecável (+2)": 5,
+            "Levemente marcado (+1)": 15,
+            "Normal (+0)": 50,
+            "Bem usado (-1)": 20,
+            "Desgastado (-2)": 10
+        }, {
+            "adicionar_cor": True,
+            "chance_encantamento": True,
+            "porcentagem_encantamento": 30,
+            "adicionar_qualidade": True,
+            "gerar_moedas": True
+        }
 
 def salvar_parametros():
     novos_pesos = {
@@ -72,12 +146,35 @@ def salvar_parametros():
         "Raro": var_peso_raro.get(), "Épico": var_peso_epico.get(),
         "Lendário": var_peso_lendario.get()
     }
-    with open(obter_caminho('parametros.json'), 'w', encoding='utf-8') as f:
-        json.dump(novos_pesos, f, indent=2)
-    resultado_texto.config(state=tk.NORMAL)
-    resultado_texto.delete("1.0", tk.END)
-    resultado_texto.insert("1.0", "Pesos salvos com sucesso!")
-    resultado_texto.config(state=tk.DISABLED)
+    pesos_qualidades = {
+        "Condição impecável (+2)": var_peso_impecavel.get(),
+        "Levemente marcado (+1)": var_peso_levemente_marcado.get(),
+        "Normal (+0)": var_peso_normal.get(),
+        "Bem usado (-1)": var_peso_bem_usado.get(),
+        "Desgastado (-2)": var_peso_desgastado.get()
+    }
+    atributos_dinamicos = {
+        "adicionar_cor": var_adicionar_cor.get(),
+        "chance_encantamento": var_chance_encantamento.get(),
+        "porcentagem_encantamento": var_porcentagem_encantamento.get(),
+        "adicionar_qualidade": var_adicionar_qualidade.get(),
+        "gerar_moedas": var_gerar_moedas.get()
+    }
+    parametros_completos = {
+        "pesos_raridade": novos_pesos,
+        "pesos_qualidade": pesos_qualidades,
+        "atributos_dinamicos": atributos_dinamicos
+    }
+    
+    try:
+        with open(obter_caminho('parametros.json'), 'w', encoding='utf-8') as f:
+            json.dump(parametros_completos, f, indent=2, ensure_ascii=False)
+        resultado_texto.config(state=tk.NORMAL)
+        resultado_texto.delete("1.0", tk.END)
+        resultado_texto.insert("1.0", "✅ Todas as configurações foram salvas com sucesso!")
+        resultado_texto.config(state=tk.DISABLED)
+    except Exception as e:
+        messagebox.showerror("Erro ao Salvar", f"Não foi possível salvar os parâmetros:\n{e}")
 
 def salvar_historico():
     # Esta função precisa de uma lógica para não salvar o texto padrão
@@ -91,55 +188,110 @@ def salvar_historico():
     with open(obter_caminho('historico.json'), 'w', encoding='utf-8') as f:
         json.dump(dados_historico, f, indent=2)
 
+def limpar_historico():
+    """Limpa todo o histórico de recompensas e rolagens"""
+    resposta = messagebox.askyesno("Limpar Histórico", 
+                                  "Deseja limpar todo o histórico?\n\n"
+                                  "Isso apagará:\n"
+                                  "• Todas as recompensas geradas\n"
+                                  "• Todos os logs de rolagem de dados\n\n"
+                                  "Esta ação não pode ser desfeita.")
+    if resposta:
+        # Limpar textos na interface
+        resultado_texto.config(state=tk.NORMAL)
+        resultado_texto.delete("1.0", tk.END)
+        resultado_texto.insert("1.0", "🎮 Bem-vindo ao Morikawa Loot Generator!\n\n"
+                                      "🎯 Suas recompensas aparecerão aqui.\n\n"
+                                      "✨ Configure as opções acima\n"
+                                      "🚀 Clique em 'Gerar Recompensa Completa'\n\n"
+                                      "💡 Use 'Manter Itens' para adicionar exemplos")
+        resultado_texto.config(state=tk.DISABLED)
+        
+        resultado_dados_texto.config(state=tk.NORMAL)
+        resultado_dados_texto.delete("1.0", tk.END)
+        resultado_dados_texto.insert("1.0", "🎲 Resultados das rolagens aparecerão aqui")
+        resultado_dados_texto.config(state=tk.DISABLED)
+        
+        # Remover arquivo de histórico
+        try:
+            arquivo_historico = obter_caminho('historico.json')
+            if os.path.exists(arquivo_historico):
+                os.remove(arquivo_historico)
+        except Exception as e:
+            print(f"Erro ao remover arquivo de histórico: {e}")
+        
+        messagebox.showinfo("Histórico Limpo", "Todo o histórico foi limpo com sucesso!")
+
 def carregar_historico():
     try:
         if not os.path.exists(obter_caminho('historico.json')):
-            return # Não faz nada se o arquivo de histórico não existe
+            return # Não faz nada se o arquivo de histórico não existe, mantendo a mensagem de boas-vindas
 
         with open(obter_caminho('historico.json'), 'r', encoding='utf-8') as f:
             dados_historico = json.load(f)
+            
             conteudo_recompensas = dados_historico.get("recompensas", "")
-            resultado_texto.config(state=tk.NORMAL)
-            resultado_texto.delete("1.0", tk.END)
-            resultado_texto.insert("1.0", conteudo_recompensas or "O resultado da recompensa aparecerá aqui.")
-            resultado_texto.config(state=tk.DISABLED)
+            # Só substitui a mensagem de boas-vindas se há conteúdo válido de histórico
+            if conteudo_recompensas and conteudo_recompensas.strip() and "aparecerá aqui" not in conteudo_recompensas:
+                resultado_texto.config(state=tk.NORMAL)
+                resultado_texto.delete("1.0", tk.END)
+                resultado_texto.insert("1.0", conteudo_recompensas)
+                resultado_texto.config(state=tk.DISABLED)
             
             conteudo_rolagens = dados_historico.get("rolagens", "")
-            resultado_dados_texto.config(state=tk.NORMAL)
-            resultado_dados_texto.delete("1.0", tk.END)
-            resultado_dados_texto.insert("1.0", conteudo_rolagens or "O resultado das rolagens aparecerá aqui...")
-            resultado_dados_texto.config(state=tk.DISABLED)
+            if conteudo_rolagens and conteudo_rolagens.strip() and "aparecerá aqui" not in conteudo_rolagens:
+                resultado_dados_texto.config(state=tk.NORMAL)
+                resultado_dados_texto.delete("1.0", tk.END)
+                resultado_dados_texto.insert("1.0", conteudo_rolagens)
+                resultado_dados_texto.config(state=tk.DISABLED)
 
     except (FileNotFoundError, json.JSONDecodeError):
         pass # Silenciosamente ignora se o arquivo estiver corrompido ou não for encontrado
 
 # --- Lógica de Geração ---
 def gerar_recompensa_completa():
-    raridades_config = {
-        "Comum": {"check": var_comum.get(), "peso": var_peso_comum.get()},
-        "Incomum": {"check": var_incomum.get(), "peso": var_peso_incomum.get()},
-        "Raro": {"check": var_raro.get(), "peso": var_peso_raro.get()},
-        "Épico": {"check": var_epico.get(), "peso": var_peso_epico.get()},
-        "Lendário": {"check": var_lendario.get(), "peso": var_peso_lendario.get()}
-    }
+    # Otimização: pre-filtrar raridades ativas uma vez só
+    raridades_ativas = {}
+    for nome, config in [
+        ("Comum", {"check": var_comum.get(), "peso": var_peso_comum.get()}),
+        ("Incomum", {"check": var_incomum.get(), "peso": var_peso_incomum.get()}),
+        ("Raro", {"check": var_raro.get(), "peso": var_peso_raro.get()}),
+        ("Épico", {"check": var_epico.get(), "peso": var_peso_epico.get()}),
+        ("Lendário", {"check": var_lendario.get(), "peso": var_peso_lendario.get()})
+    ]:
+        if config["check"] and config["peso"] > 0:
+            raridades_ativas[nome] = config["peso"]
+    
     if not LISTA_DE_LOOT_GLOBAL:
         resultado_texto.config(state=tk.NORMAL)
         resultado_texto.delete("1.0", tk.END)
-        resultado_texto.insert("1.0", "ERRO: 'loot_geral.csv' está vazio.\nAdicione itens na aba 'Manter Itens'.")
+        resultado_texto.insert("1.0", "❌ ERRO: Nenhum item cadastrado!\n\n"
+                                      "💡 Para usar o gerador:\n"
+                                      "1. Vá para a aba 'Manter Itens'\n"
+                                      "2. Clique em 'Carregar Itens de Exemplo'\n"
+                                      "   OU adicione seus próprios itens\n"
+                                      "3. Volte aqui e clique em 'Gerar Recompensa'")
         resultado_texto.config(state=tk.DISABLED)
         return
     
+    # Otimização: filtrar uma vez e separar lista de pesos
     piscina_de_itens_filtrada = []
     pesos_dos_itens_filtrados = []
     for item in LISTA_DE_LOOT_GLOBAL:
         raridade = item.get('raridade')
-        if raridade and raridades_config.get(raridade, {}).get("check") and raridades_config.get(raridade, {}).get("peso", 0) > 0:
+        if raridade in raridades_ativas:
             piscina_de_itens_filtrada.append(item)
-            pesos_dos_itens_filtrados.append(raridades_config[raridade]["peso"])
+            pesos_dos_itens_filtrados.append(raridades_ativas[raridade])
+    
     if not piscina_de_itens_filtrada:
         resultado_texto.config(state=tk.NORMAL)
         resultado_texto.delete("1.0", tk.END)
-        resultado_texto.insert("1.0", "Nenhum item disponível para sorteio.\nVerifique as raridades selecionadas, seus pesos e se existem itens cadastrados para elas.")
+        resultado_texto.insert("1.0", "⚠️ Nenhum item disponível para sorteio!\n\n"
+                                      "🔍 Verifique se:\n"
+                                      "• Pelo menos uma raridade está marcada\n"
+                                      "• Os pesos das raridades são maiores que 0\n"
+                                      "• Existem itens cadastrados para as raridades selecionadas\n\n"
+                                      "💡 Dica: Vá na aba 'Manter Itens' para ver os itens cadastrados")
         resultado_texto.config(state=tk.DISABLED)
         return
     
@@ -148,46 +300,100 @@ def gerar_recompensa_completa():
     if quantidade_itens > 0:
         itens_sorteados_final = random.choices(piscina_de_itens_filtrada, weights=pesos_dos_itens_filtrados, k=quantidade_itens)
     
+    # Listas pré-definidas para atributos dinâmicos (reutilizar)
+    lista_de_cores = ["Vermelho", "Azul", "Verde", "Amarelo", "Preto", "Branco", "Roxo", "Laranja", "Cinza", "Marrom"]
+    lista_de_encantamentos = ["Elétrico", "Fogo", "Gelo", "Arcano", "Luz", "Maldição", "Natural", "Sangramento", "Veneno"]
+    
+    # Qualidades com pesos configuráveis pelo usuário
+    qualidades = {
+        "Condição impecável (+2)": var_peso_impecavel.get(),
+        "Levemente marcado (+1)": var_peso_levemente_marcado.get(),
+        "Normal (+0)": var_peso_normal.get(),
+        "Bem usado (-1)": var_peso_bem_usado.get(),
+        "Desgastado (-2)": var_peso_desgastado.get()
+    }
+    
     resultado_texto.config(state=tk.NORMAL)
     resultado_texto.delete("1.0", tk.END)
     if itens_sorteados_final:
-        resultado_texto.insert(tk.END, "Itens Sorteados:\n")
+        resultado_texto.insert(tk.END, "🎁 Itens Sorteados:\n")
         for item in itens_sorteados_final:
+            nome_item = item['nome_item']
             raridade = item['raridade']
-            linha = f"- {item['nome_item']} ({raridade})\n"
+            
+            # Construir o nome completo do item com atributos
+            nome_completo = nome_item
+            
+            # Adicionar cor se selecionado
+            if var_adicionar_cor.get():
+                cor = random.choice(lista_de_cores)
+                nome_completo += f" {cor}"
+            
+            # Adicionar qualidade se selecionado
+            qualidade_texto = ""
+            if var_adicionar_qualidade.get():
+                # Filtra qualidades com peso maior que zero
+                qualidades_validas = {k: v for k, v in qualidades.items() if v > 0}
+                if qualidades_validas:
+                    qualidade_lista = list(qualidades_validas.keys())
+                    pesos_qualidade = list(qualidades_validas.values())
+                    qualidade_escolhida = random.choices(qualidade_lista, weights=pesos_qualidade, k=1)[0]
+                    qualidade_texto = f" • {qualidade_escolhida}"
+            
+            # Adicionar encantamento se selecionado e passou na chance
+            encantamento_texto = ""
+            if var_chance_encantamento.get():
+                chance = random.randint(1, 100)
+                if chance <= var_porcentagem_encantamento.get():
+                    encantamento = random.choice(lista_de_encantamentos)
+                    encantamento_texto = f" • <{encantamento}>"
+            
+            # Montar a linha final com formatação melhorada
+            linha = f"⚔️ {nome_completo}{qualidade_texto}{encantamento_texto} • ({raridade})\n"
             resultado_texto.insert(tk.END, linha, raridade)
+    
     min_val, max_val = var_min_moedas.get(), var_max_moedas.get()
     if min_val > max_val: min_val, max_val = max_val, min_val
-    quantidade_gerada = random.randint(min_val, max_val)
+    quantidade_gerada = 0
+    if var_gerar_moedas.get():
+        quantidade_gerada = random.randint(min_val, max_val)
     if quantidade_gerada > 0:
         if itens_sorteados_final:
             resultado_texto.insert(tk.END, "\n") 
-        resultado_texto.insert(tk.END, f"Moedas (LMD): {quantidade_gerada}")
+        resultado_texto.insert(tk.END, f"💰 Moedas (LMD): {quantidade_gerada}")
     if not itens_sorteados_final and quantidade_gerada == 0:
-        resultado_texto.insert(tk.END, "Nada foi gerado. Verifique a quantidade de itens ou o range de moedas.")
+        resultado_texto.insert(tk.END, "🤔 Nada foi gerado!\n\n"
+                                       "💡 Verifique:\n"
+                                       "• Quantidade de itens > 0\n"
+                                       "• Gerar moedas ativado\n"
+                                       "• Pelo menos uma raridade selecionada")
     resultado_texto.config(state=tk.DISABLED)
     janela.focus_set()
 
 # --- Funções CRUD ---
 def atualizar_treeview_loot(filtro=""):
-    for i in tree_loot.get_children():
-        tree_loot.delete(i)
-    lista_para_exibir = sorted(LISTA_DE_LOOT_GLOBAL, key=lambda item: item['nome_item'])
+    # Otimização: limpar apenas se necessário
+    children = tree_loot.get_children()
+    if children:
+        tree_loot.delete(*children)  # Método mais rápido
+    
+    # Filtrar e ordenar em uma só operação
     if filtro:
-        filtro = filtro.lower()
-        lista_filtrada = [item for item in lista_para_exibir if filtro in item['nome_item'].lower()]
-        lista_para_exibir = lista_filtrada
-    iids_usados = set()
-    for item in lista_para_exibir:
-        raridade = item['raridade']
-        nome_base = item['nome_item']
-        iid_final = nome_base
-        sufixo_contador = 2
-        while iid_final in iids_usados:
-            iid_final = f"{nome_base}_{sufixo_contador}"
-            sufixo_contador += 1
-        iids_usados.add(iid_final)
-        tree_loot.insert("", "end", iid=iid_final, values=(item['nome_item'], raridade), tags=(raridade,))
+        filtro_lower = filtro.lower()
+        lista_para_exibir = [item for item in LISTA_DE_LOOT_GLOBAL 
+                           if filtro_lower in item['nome_item'].lower()]
+    else:
+        lista_para_exibir = LISTA_DE_LOOT_GLOBAL
+    
+    # Ordenar apenas se necessário
+    if len(lista_para_exibir) > 1:
+        lista_para_exibir.sort(key=lambda item: item['nome_item'])
+    
+    # Inserção otimizada
+    for i, item in enumerate(lista_para_exibir):
+        tree_loot.insert("", "end", iid=str(i), 
+                        values=(item['nome_item'], item['raridade']), 
+                        tags=(item['raridade'],))
 
 def on_item_selecionado(event):
     if not tree_loot.selection(): return
@@ -333,10 +539,14 @@ def on_delete_key(event):
 
 # --- Início do Programa e Interface Gráfica ---
 LISTA_DE_LOOT_GLOBAL = carregar_loot_geral('loot_geral.csv')
-PESOS_INICIAIS = carregar_parametros('parametros.json')
+PESOS_INICIAIS, PESOS_QUALIDADES_INICIAIS, ATRIBUTOS_INICIAIS = carregar_parametros('parametros.json')
 
 janela = tk.Tk()
 janela.title("Morikawa Loot")
+
+# NOVA OTIMIZAÇÃO: Ocultar janela durante carregamento para evitar flickering
+janela.withdraw()  # Esconde a janela
+
 try:
     caminho_icone = obter_caminho('icone.ico')
     janela.iconbitmap(caminho_icone)
@@ -345,9 +555,9 @@ except tk.TclError:
 except Exception as e:
     print(f"Erro ao carregar ícone: {e}")
 
-
-janela.geometry("600x800")
-janela.minsize(550, 700)
+janela.geometry("750x600")  # Tamanho inicial adequado
+janela.minsize(650, 500)  # Mínimo funcional
+# Configurar expansão completa da janela
 janela.columnconfigure(0, weight=1)
 janela.rowconfigure(0, weight=1)
 
@@ -359,71 +569,393 @@ def alternar_tema():
         sv_ttk.set_theme("light")
 
 notebook = ttk.Notebook(janela)
-notebook.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+notebook.grid(row=0, column=0, sticky="nsew")  # Remover padding para usar toda a tela
+
+# Otimização para reduzir "flickering" das abas - MUITO melhorada
+def on_tab_changed(event):
+    # Não fazer nada! Deixar o canvas se ajustar naturalmente
+    pass
+
+notebook.bind("<<NotebookTabChanged>>", on_tab_changed)
 
 frame_botoes_tema = ttk.Frame(janela)
-frame_botoes_tema.grid(row=1, column=0, sticky="e", padx=10, pady=(0, 10))
+frame_botoes_tema.grid(row=1, column=0, sticky="e", padx=5, pady=(0, 5))
 botao_tema = ttk.Button(frame_botoes_tema, text="Alternar Tema", command=alternar_tema)
 botao_tema.pack()
 
 # --- Aba 1: Gerador de Recompensa ---
 tab_sorteio = ttk.Frame(notebook)
 notebook.add(tab_sorteio, text='Gerador de Recompensa')
-var_comum = tk.BooleanVar(value=True); var_incomum = tk.BooleanVar(value=True); var_raro = tk.BooleanVar(value=True); var_epico = tk.BooleanVar(value=False); var_lendario = tk.BooleanVar(value=False)
+
+# Configurar expansão total da aba
+tab_sorteio.columnconfigure(0, weight=1)
+tab_sorteio.rowconfigure(0, weight=1)
+
+# Criar Canvas com Scrollbar para toda a aba - Otimizado
+canvas_sorteio = tk.Canvas(tab_sorteio, highlightthickness=0)
+scrollbar_sorteio = ttk.Scrollbar(tab_sorteio, orient="vertical", command=canvas_sorteio.yview)
+frame_scrollable = ttk.Frame(canvas_sorteio)
+
+# Flag para controlar reconfigurações
+canvas_configurado = False
+
+# Configuração responsiva do canvas - MUITO otimizada
+def configurar_canvas(event=None):
+    global canvas_configurado
+    
+    # Evitar reconfigurações desnecessárias
+    if not frame_scrollable.winfo_exists():
+        return
+    
+    try:
+        # Só reconfigurar se realmente necessário
+        bbox = canvas_sorteio.bbox("all")
+        if bbox:
+            canvas_sorteio.configure(scrollregion=bbox)
+        
+        # Ajustar largura para usar toda a tela - CORRIGIDO
+        canvas_width = canvas_sorteio.winfo_width()
+        if canvas_width > 1:
+            canvas_sorteio.itemconfig(canvas_window, width=canvas_width)
+            canvas_configurado = True
+            
+    except tk.TclError:
+        pass
+
+# Configurar responsividade completa do frame scrollable
+frame_scrollable.columnconfigure(0, weight=1)
+frame_scrollable.rowconfigure(0, weight=0)  # Configs
+frame_scrollable.rowconfigure(1, weight=0)  # Quantidades  
+frame_scrollable.rowconfigure(2, weight=0)  # Botões
+frame_scrollable.rowconfigure(3, weight=0)  # Qualidades
+frame_scrollable.rowconfigure(4, weight=1)  # Resultados - usa toda altura restante
+
+# Bind otimizado - só quando realmente necessário
+def on_frame_configure(event):
+    # Reconfigurar sempre para manter responsividade
+    if event.widget == frame_scrollable:
+        janela.after_idle(configurar_canvas)
+
+# Bind para redimensionamento da janela - garantir responsividade completa
+def on_canvas_configure(event):
+    # Quando o canvas muda de tamanho, ajustar o frame interno
+    canvas_width = event.width
+    canvas_sorteio.itemconfig(canvas_window, width=canvas_width)
+
+frame_scrollable.bind("<Configure>", on_frame_configure)
+canvas_sorteio.bind("<Configure>", on_canvas_configure)
+
+canvas_window = canvas_sorteio.create_window((0, 0), window=frame_scrollable, anchor="nw")
+canvas_sorteio.configure(yscrollcommand=scrollbar_sorteio.set)
+
+canvas_sorteio.pack(side="left", fill="both", expand=True)
+scrollbar_sorteio.pack(side="right", fill="y")
+
+# Configuração inicial única - após tudo estar pronto
+def configuracao_inicial():
+    try:
+        # Forçar configuração inicial completa
+        canvas_sorteio.update_idletasks()
+        configurar_canvas()
+        # Garantir que o canvas use toda a largura
+        canvas_width = canvas_sorteio.winfo_width()
+        if canvas_width > 1:
+            canvas_sorteio.itemconfig(canvas_window, width=canvas_width)
+        # Marcar como configurado
+        global canvas_configurado
+        canvas_configurado = True
+    except:
+        pass
+
+janela.after(200, configuracao_inicial)  # Delay maior para garantir que tudo está carregado
+
+# Bind mouse wheel com limites mais rigorosos e otimizado
+def _on_mousewheel(event):
+    try:
+        # Verificar se estamos na aba correta
+        current_tab = notebook.index(notebook.select())
+        if current_tab != 0:  # Só funciona na primeira aba (Gerador de Recompensa)
+            return
+            
+        # Obter informações do canvas
+        bbox = canvas_sorteio.bbox("all")
+        if not bbox:
+            return
+        
+        canvas_height = canvas_sorteio.winfo_height()
+        content_height = bbox[3] - bbox[1]
+        
+        # Se o conteúdo cabe na tela, não rolar
+        if content_height <= canvas_height:
+            return
+        
+        # Obter posição atual do scroll
+        current_top = canvas_sorteio.canvasy(0)
+        
+        # Calcular novo scroll - movimento mais suave
+        scroll_amount = int(-1*(event.delta/120))
+        new_top = current_top + (scroll_amount * 15)  # Reduzido de 20 para 15 pixels
+        
+        # Limitar o scroll
+        if new_top < 0:
+            new_top = 0
+        elif new_top > (content_height - canvas_height):
+            new_top = content_height - canvas_height
+        
+        # Aplicar o scroll apenas se mudou significativamente
+        if abs(new_top - current_top) > 2:  # Só rolar se diferença for > 2px
+            canvas_sorteio.yview_moveto(new_top / content_height)
+    except (tk.TclError, ZeroDivisionError):
+        pass  # Ignorar erros
+
+canvas_sorteio.bind_all("<MouseWheel>", _on_mousewheel)
+var_comum = tk.BooleanVar(value=True); var_incomum = tk.BooleanVar(value=True); var_raro = tk.BooleanVar(value=True); var_epico = tk.BooleanVar(value=True); var_lendario = tk.BooleanVar(value=True)
 var_peso_comum = tk.IntVar(value=PESOS_INICIAIS.get("Comum", 65)); var_peso_incomum = tk.IntVar(value=PESOS_INICIAIS.get("Incomum", 20)); var_peso_raro = tk.IntVar(value=PESOS_INICIAIS.get("Raro", 10)); var_peso_epico = tk.IntVar(value=PESOS_INICIAIS.get("Épico", 4)); var_peso_lendario = tk.IntVar(value=PESOS_INICIAIS.get("Lendário", 1))
-var_quantidade_itens = tk.IntVar(value=1)
+var_quantidade_itens = tk.IntVar(value=3)  # 3 itens por padrão para demo mais interessante
 var_min_moedas = tk.IntVar(value=1)
 var_max_moedas = tk.IntVar(value=100)
-frame_configs = ttk.LabelFrame(tab_sorteio, text="1. Configure as Probabilidades (Pesos)", padding="10")
-frame_configs.pack(fill=tk.X, pady=5, padx=5, side=tk.TOP)
-ttk.Label(frame_configs, text="Incluir?").grid(row=0, column=0); ttk.Label(frame_configs, text="Raridade").grid(row=0, column=1); ttk.Label(frame_configs, text="Peso").grid(row=0, column=2)
-ttk.Checkbutton(frame_configs, variable=var_comum).grid(row=1, column=0); ttk.Label(frame_configs, text="Comum").grid(row=1, column=1); ttk.Spinbox(frame_configs, from_=0, to=1000, textvariable=var_peso_comum, width=5).grid(row=1, column=2)
-ttk.Checkbutton(frame_configs, variable=var_incomum).grid(row=2, column=0); ttk.Label(frame_configs, text="Incomum").grid(row=2, column=1); ttk.Spinbox(frame_configs, from_=0, to=1000, textvariable=var_peso_incomum, width=5).grid(row=2, column=2)
-ttk.Checkbutton(frame_configs, variable=var_raro).grid(row=3, column=0); ttk.Label(frame_configs, text="Raro").grid(row=3, column=1); ttk.Spinbox(frame_configs, from_=0, to=1000, textvariable=var_peso_raro, width=5).grid(row=3, column=2)
-ttk.Checkbutton(frame_configs, variable=var_epico).grid(row=4, column=0); ttk.Label(frame_configs, text="Épico").grid(row=4, column=1); ttk.Spinbox(frame_configs, from_=0, to=1000, textvariable=var_peso_epico, width=5).grid(row=4, column=2)
-ttk.Checkbutton(frame_configs, variable=var_lendario).grid(row=5, column=0); ttk.Label(frame_configs, text="Lendário").grid(row=5, column=1); ttk.Spinbox(frame_configs, from_=0, to=1000, textvariable=var_peso_lendario, width=5).grid(row=5, column=2)
-ttk.Button(frame_configs, text="Salvar Pesos como Padrão", command=salvar_parametros).grid(row=6, column=1, columnspan=2, pady=10)
-frame_quantidades = ttk.LabelFrame(tab_sorteio, text="2. Escolha as Quantidades", padding="10")
-frame_quantidades.pack(fill=tk.X, pady=10, padx=5, side=tk.TOP)
-ttk.Label(frame_quantidades, text="Qtd. Itens:").grid(row=0, column=0, padx=5, pady=5)
-ttk.Spinbox(frame_quantidades, from_=0, to=20, textvariable=var_quantidade_itens, width=5).grid(row=0, column=1, padx=5, pady=5)
-ttk.Label(frame_quantidades, text="Min Moedas:").grid(row=1, column=0, padx=5, pady=5)
-ttk.Spinbox(frame_quantidades, from_=0, to=10000, textvariable=var_min_moedas, width=8).grid(row=1, column=1, padx=5, pady=5)
-ttk.Label(frame_quantidades, text="Max Moedas:").grid(row=1, column=2, padx=5, pady=5)
-ttk.Spinbox(frame_quantidades, from_=0, to=10000, textvariable=var_max_moedas, width=8).grid(row=1, column=3, padx=5, pady=5)
-frame_botoes_sorteio = ttk.Frame(tab_sorteio)
-frame_botoes_sorteio.pack(pady=10, side=tk.TOP)
-botao_sortear_tudo = ttk.Button(frame_botoes_sorteio, text="Gerar Recompensa Completa!", command=gerar_recompensa_completa)
-botao_sortear_tudo.pack(side=tk.LEFT, padx=5)
-resultado_texto = tk.Text(tab_sorteio, height=10, wrap="word", relief="flat", borderwidth=0, font=("Segoe UI", 11))
-resultado_texto.pack(pady=10, padx=5, fill="both", expand=True, side=tk.TOP)
+var_gerar_moedas = tk.BooleanVar(value=ATRIBUTOS_INICIAIS.get("gerar_moedas", True))
+
+# Novas variáveis para atributos dinâmicos
+var_adicionar_cor = tk.BooleanVar(value=ATRIBUTOS_INICIAIS.get("adicionar_cor", True))
+var_chance_encantamento = tk.BooleanVar(value=ATRIBUTOS_INICIAIS.get("chance_encantamento", True))
+var_porcentagem_encantamento = tk.IntVar(value=ATRIBUTOS_INICIAIS.get("porcentagem_encantamento", 30))
+var_adicionar_qualidade = tk.BooleanVar(value=ATRIBUTOS_INICIAIS.get("adicionar_qualidade", True))
+
+# Variáveis para os pesos das qualidades
+var_peso_impecavel = tk.IntVar(value=PESOS_QUALIDADES_INICIAIS.get("Condição impecável (+2)", 5))
+var_peso_levemente_marcado = tk.IntVar(value=PESOS_QUALIDADES_INICIAIS.get("Levemente marcado (+1)", 15))
+var_peso_normal = tk.IntVar(value=PESOS_QUALIDADES_INICIAIS.get("Normal (+0)", 50))
+var_peso_bem_usado = tk.IntVar(value=PESOS_QUALIDADES_INICIAIS.get("Bem usado (-1)", 20))
+var_peso_desgastado = tk.IntVar(value=PESOS_QUALIDADES_INICIAIS.get("Desgastado (-2)", 10))
+frame_configs = ttk.LabelFrame(frame_scrollable, text="1. Configure as Probabilidades e Atributos", padding="8")
+frame_configs.pack(fill=tk.X, pady=(0, 10), padx=5, side=tk.TOP)
+
+# Criar um frame interno com duas colunas
+frame_interno = ttk.Frame(frame_configs)
+frame_interno.pack(fill=tk.BOTH, expand=True)
+frame_interno.columnconfigure(0, weight=1)
+frame_interno.columnconfigure(2, weight=1)
+
+# Coluna esquerda - Raridades
+frame_raridades = ttk.Frame(frame_interno)
+frame_raridades.pack(side=tk.LEFT, fill="both", expand=True, padx=(0,10))
+
+ttk.Label(frame_raridades, text="Incluir?", font=("Segoe UI", 9, "bold")).grid(row=0, column=0, padx=5, pady=3)
+ttk.Label(frame_raridades, text="Raridade", font=("Segoe UI", 9, "bold")).grid(row=0, column=1, padx=5, pady=3)
+ttk.Label(frame_raridades, text="Peso", font=("Segoe UI", 9, "bold")).grid(row=0, column=2, padx=5, pady=3)
+
+ttk.Label(frame_raridades, text="Incluir?", font=("Segoe UI", 9, "bold")).grid(row=0, column=0, padx=5, pady=3)
+ttk.Label(frame_raridades, text="Raridade", font=("Segoe UI", 9, "bold")).grid(row=0, column=1, padx=5, pady=3)
+ttk.Label(frame_raridades, text="Peso", font=("Segoe UI", 9, "bold")).grid(row=0, column=2, padx=5, pady=3)
+
+ttk.Checkbutton(frame_raridades, variable=var_comum).grid(row=1, column=0, padx=5, pady=2)
+ttk.Label(frame_raridades, text="Comum").grid(row=1, column=1, padx=5, pady=2, sticky="w")
+ttk.Spinbox(frame_raridades, from_=0, to=1000, textvariable=var_peso_comum, width=8).grid(row=1, column=2, padx=5, pady=2)
+
+ttk.Checkbutton(frame_raridades, variable=var_incomum).grid(row=2, column=0, padx=5, pady=2)
+ttk.Label(frame_raridades, text="Incomum").grid(row=2, column=1, padx=5, pady=2, sticky="w")
+ttk.Spinbox(frame_raridades, from_=0, to=1000, textvariable=var_peso_incomum, width=8).grid(row=2, column=2, padx=5, pady=2)
+
+ttk.Checkbutton(frame_raridades, variable=var_raro).grid(row=3, column=0, padx=5, pady=2)
+ttk.Label(frame_raridades, text="Raro").grid(row=3, column=1, padx=5, pady=2, sticky="w")
+ttk.Spinbox(frame_raridades, from_=0, to=1000, textvariable=var_peso_raro, width=8).grid(row=3, column=2, padx=5, pady=2)
+
+ttk.Checkbutton(frame_raridades, variable=var_epico).grid(row=4, column=0, padx=5, pady=2)
+ttk.Label(frame_raridades, text="Épico").grid(row=4, column=1, padx=5, pady=2, sticky="w")
+ttk.Spinbox(frame_raridades, from_=0, to=1000, textvariable=var_peso_epico, width=8).grid(row=4, column=2, padx=5, pady=2)
+
+ttk.Checkbutton(frame_raridades, variable=var_lendario).grid(row=5, column=0, padx=5, pady=2)
+ttk.Label(frame_raridades, text="Lendário").grid(row=5, column=1, padx=5, pady=2, sticky="w")
+ttk.Spinbox(frame_raridades, from_=0, to=1000, textvariable=var_peso_lendario, width=8).grid(row=5, column=2, padx=5, pady=2)
+
+# Separador vertical
+ttk.Separator(frame_interno, orient='vertical').pack(side=tk.LEFT, fill='y', padx=5)
+
+# Coluna direita - Atributos dinâmicos
+frame_atributos = ttk.Frame(frame_interno)
+frame_atributos.pack(side=tk.LEFT, fill="both", expand=True, padx=(5,0))
+
+ttk.Label(frame_atributos, text="Atributos Dinâmicos", font=("Segoe UI", 10, "bold")).grid(row=0, column=0, columnspan=3, pady=(0,10))
+
+ttk.Checkbutton(frame_atributos, text="Adicionar Cor Aleatória?", variable=var_adicionar_cor).grid(row=1, column=0, columnspan=3, padx=5, pady=3, sticky="w")
+
+check_encantamento = ttk.Checkbutton(frame_atributos, text="Chance de Encantamento?", variable=var_chance_encantamento)
+check_encantamento.grid(row=2, column=0, columnspan=2, padx=5, pady=3, sticky="w")
+
+spinbox_encantamento = ttk.Spinbox(frame_atributos, from_=0, to=100, textvariable=var_porcentagem_encantamento, width=8)
+label_porcentagem = ttk.Label(frame_atributos, text="%")
+
+def toggle_controle_encantamento():
+    if var_chance_encantamento.get():
+        spinbox_encantamento.grid(row=3, column=0, padx=5, pady=3)
+        label_porcentagem.grid(row=3, column=1, padx=5, pady=3)
+    else:
+        spinbox_encantamento.grid_remove()
+        label_porcentagem.grid_remove()
+
+var_chance_encantamento.trace_add("write", lambda *args: toggle_controle_encantamento())
+toggle_controle_encantamento()
+
+check_qualidade = ttk.Checkbutton(frame_atributos, text="Adicionar Qualidade do Item?", variable=var_adicionar_qualidade)
+check_qualidade.grid(row=4, column=0, columnspan=3, padx=5, pady=3, sticky="w")
+
+# Frame para quantidades
+frame_quantidades = ttk.LabelFrame(frame_scrollable, text="2. Quantidades", padding="8")
+frame_quantidades.pack(fill=tk.X, pady=(0, 10), padx=5, side=tk.TOP)
+
+frame_quant_interno = ttk.Frame(frame_quantidades)
+frame_quant_interno.pack(fill=tk.BOTH, expand=True)
+
+ttk.Label(frame_quant_interno, text="Qtd. Itens:").grid(row=0, column=0, padx=5, pady=3, sticky="e")
+ttk.Spinbox(frame_quant_interno, from_=0, to=20, textvariable=var_quantidade_itens, width=10).grid(row=0, column=1, padx=5, pady=3, sticky="w")
+
+check_moedas = ttk.Checkbutton(frame_quant_interno, text="Gerar Moedas?", variable=var_gerar_moedas)
+check_moedas.grid(row=1, column=0, columnspan=2, padx=5, pady=3, sticky="w")
+
+label_min_moedas = ttk.Label(frame_quant_interno, text="Min:")
+spinbox_min_moedas = ttk.Spinbox(frame_quant_interno, from_=0, to=10000, textvariable=var_min_moedas, width=10)
+label_max_moedas = ttk.Label(frame_quant_interno, text="Max:")
+spinbox_max_moedas = ttk.Spinbox(frame_quant_interno, from_=0, to=10000, textvariable=var_max_moedas, width=10)
+
+def toggle_controles_moedas():
+    if var_gerar_moedas.get():
+        label_min_moedas.grid(row=2, column=0, padx=5, pady=2, sticky="e")
+        spinbox_min_moedas.grid(row=2, column=1, padx=5, pady=2, sticky="w")
+        label_max_moedas.grid(row=3, column=0, padx=5, pady=2, sticky="e")
+        spinbox_max_moedas.grid(row=3, column=1, padx=5, pady=2, sticky="w")
+    else:
+        label_min_moedas.grid_remove()
+        spinbox_min_moedas.grid_remove()
+        label_max_moedas.grid_remove()
+        spinbox_max_moedas.grid_remove()
+
+var_gerar_moedas.trace_add("write", lambda *args: toggle_controles_moedas())
+toggle_controles_moedas()
+
+# Frame para botões - sempre visível
+frame_botoes = ttk.Frame(frame_scrollable)
+frame_botoes.pack(pady=(10, 15), side=tk.TOP, fill=tk.X)
+
+botao_sortear_tudo = ttk.Button(frame_botoes, text="🎲 Gerar Recompensa!", command=gerar_recompensa_completa)
+botao_sortear_tudo.pack(side=tk.LEFT, padx=5, expand=True, fill="x")
+
+botao_salvar = ttk.Button(frame_botoes, text="💾 Salvar", command=salvar_parametros)
+botao_salvar.pack(side=tk.LEFT, padx=5, expand=True, fill="x")
+
+botao_limpar_historico = ttk.Button(frame_botoes, text="🗑️ Limpar Histórico", command=limpar_historico)
+botao_limpar_historico.pack(side=tk.LEFT, padx=5, expand=True, fill="x")
+# Sub-frame para pesos das qualidades
+frame_qualidades = ttk.LabelFrame(frame_scrollable, text="Pesos das Qualidades", padding="8")
+
+def toggle_frame_qualidades():
+    if var_adicionar_qualidade.get():
+        frame_qualidades.pack(fill=tk.X, pady=(0, 10), padx=5, after=frame_configs)
+        # Organização em grid compacto
+        ttk.Label(frame_qualidades, text="Qualidade").grid(row=0, column=0, padx=5, pady=2, sticky="w")
+        ttk.Label(frame_qualidades, text="Peso").grid(row=0, column=1, padx=5, pady=2, sticky="w")
+        
+        # Controles de peso para cada qualidade em grid 2x3 para economizar espaço
+        ttk.Label(frame_qualidades, text="Impecável (+2)").grid(row=1, column=0, padx=5, pady=1, sticky="w")
+        ttk.Spinbox(frame_qualidades, from_=0, to=100, textvariable=var_peso_impecavel, width=6).grid(row=1, column=1, padx=5, pady=1)
+        
+        ttk.Label(frame_qualidades, text="Leve marcado (+1)").grid(row=1, column=2, padx=5, pady=1, sticky="w")
+        ttk.Spinbox(frame_qualidades, from_=0, to=100, textvariable=var_peso_levemente_marcado, width=6).grid(row=1, column=3, padx=5, pady=1)
+        
+        ttk.Label(frame_qualidades, text="Normal (+0)").grid(row=2, column=0, padx=5, pady=1, sticky="w")
+        ttk.Spinbox(frame_qualidades, from_=0, to=100, textvariable=var_peso_normal, width=6).grid(row=2, column=1, padx=5, pady=1)
+        
+        ttk.Label(frame_qualidades, text="Bem usado (-1)").grid(row=2, column=2, padx=5, pady=1, sticky="w")
+        ttk.Spinbox(frame_qualidades, from_=0, to=100, textvariable=var_peso_bem_usado, width=6).grid(row=2, column=3, padx=5, pady=1)
+        
+        ttk.Label(frame_qualidades, text="Desgastado (-2)").grid(row=3, column=0, padx=5, pady=1, sticky="w")
+        ttk.Spinbox(frame_qualidades, from_=0, to=100, textvariable=var_peso_desgastado, width=6).grid(row=3, column=1, padx=5, pady=1)
+    else:
+        frame_qualidades.pack_forget()
+        # Limpa todos os widgets do frame
+        for widget in frame_qualidades.winfo_children():
+            widget.destroy()
+
+# Vincula a função ao checkbox
+var_adicionar_qualidade.trace_add("write", lambda *args: toggle_frame_qualidades())
+
+# Chama a função inicialmente para definir o estado correto
+toggle_frame_qualidades()
+
+# Frame para resultados - compacto mas funcional e totalmente responsivo
+frame_resultados = ttk.LabelFrame(frame_scrollable, text="📋 Recompensas Geradas", padding="8")
+frame_resultados.pack(fill="both", expand=True, pady=(0, 10), padx=5)
+
+# Configurar responsividade completa do frame de resultados
+frame_resultados.columnconfigure(0, weight=1)
+frame_resultados.rowconfigure(0, weight=1)
+
+# Container para Text widget e scrollbar
+container_resultado = ttk.Frame(frame_resultados)
+container_resultado.grid(row=0, column=0, sticky="nsew")
+container_resultado.columnconfigure(0, weight=1)
+container_resultado.rowconfigure(0, weight=1)
+
+# Área de resultados responsiva - altura adaptável, usa toda a tela
+resultado_texto = tk.Text(container_resultado, height=12, wrap="word", relief="flat", borderwidth=0, font=("Segoe UI", 9))
+resultado_texto.grid(row=0, column=0, sticky="nsew")
+
+# Scrollbar vertical para a área de resultados
+scrollbar_resultado = ttk.Scrollbar(container_resultado, orient="vertical", command=resultado_texto.yview)
+scrollbar_resultado.grid(row=0, column=1, sticky="ns")
+resultado_texto.config(yscrollcommand=scrollbar_resultado.set)
+
+# Função para ajustar responsividade - SUPER otimizada
+def ajustar_responsividade(event=None):
+    # Desabilitar completamente para evitar flickering
+    pass
+
+# Função para resetar scroll ao topo quando necessário
+def resetar_scroll():
+    canvas_sorteio.yview_moveto(0)
+
+# Desabilitar bind de responsividade que causa flickering
+# janela.bind('<Configure>', ajustar_responsividade)  # DESABILITADO
 for raridade, cor in CORES_RARIDADE.items():
     resultado_texto.tag_configure(raridade, foreground=cor)
+
+# Mensagem inicial compacta
+resultado_texto.config(state=tk.NORMAL)
+resultado_texto.insert("1.0", "🎲 Morikawa Loot Generator\n\n"
+                              "✨ Configure as opções acima\n"
+                              "🚀 Clique em 'Gerar Recompensa Completa'\n\n"
+                              "💡 Use 'Manter Itens' para adicionar exemplos")
 resultado_texto.config(state=tk.DISABLED)
 
 # --- Aba 2: Manter Itens ---
 tab_manter_loot = ttk.Frame(notebook)
 notebook.add(tab_manter_loot, text='Manter Itens')
+
+# Configurar expansão completa da aba - igual ao Gerador de Recompensas
 tab_manter_loot.columnconfigure(0, weight=1)
-tab_manter_loot.rowconfigure(1, weight=1)
+tab_manter_loot.rowconfigure(0, weight=0)  # Filtro fixo
+tab_manter_loot.rowconfigure(1, weight=1)  # Tabela - usa toda a tela disponível
+tab_manter_loot.rowconfigure(2, weight=0)  # Formulário fixo
+tab_manter_loot.rowconfigure(3, weight=0)  # Botões fixo
+tab_manter_loot.rowconfigure(4, weight=0)  # Exemplo fixo
 var_filtro_itens = tk.StringVar()
-frame_filtro = ttk.LabelFrame(tab_manter_loot, text="Busca", padding=10)
-frame_filtro.grid(row=0, column=0, pady=5, padx=10, sticky="ew")
+frame_filtro = ttk.LabelFrame(tab_manter_loot, text="Busca", padding=8)
+frame_filtro.grid(row=0, column=0, pady=(5, 3), padx=10, sticky="ew")
 ttk.Label(frame_filtro, text="Filtrar por nome:").pack(side=tk.LEFT, padx=(0,5))
 entry_filtro = ttk.Entry(frame_filtro, textvariable=var_filtro_itens)
 entry_filtro.pack(fill="x", expand=True)
 def aplicar_filtro(*args):
     atualizar_treeview_loot(filtro=var_filtro_itens.get())
 var_filtro_itens.trace_add("write", aplicar_filtro)
-frame_lista = ttk.LabelFrame(tab_manter_loot, text="Lista de Itens", padding=10)
-frame_lista.grid(row=1, column=0, pady=10, padx=10, sticky="nsew")
+frame_lista = ttk.LabelFrame(tab_manter_loot, text="Lista de Itens", padding=8)
+frame_lista.grid(row=1, column=0, pady=(3, 3), padx=10, sticky="nsew")
 frame_lista.rowconfigure(0, weight=1)
 frame_lista.columnconfigure(0, weight=1)
 cols = ('nome_item', 'raridade')
-tree_loot = ttk.Treeview(frame_lista, columns=cols, show='headings', height=10)
+tree_loot = ttk.Treeview(frame_lista, columns=cols, show='headings', height=20)  # Aumentar ainda mais para 20
 tree_loot.grid(row=0, column=0, sticky="nsew")
-tree_loot.column('nome_item', width=300)
-tree_loot.column('raridade', width=100, anchor=tk.CENTER)
+tree_loot.column('nome_item', width=400, minwidth=250)  # Aumentar ainda mais a largura
+tree_loot.column('raridade', width=130, minwidth=110, anchor=tk.CENTER)  # Aumentar largura
 scrollbar = ttk.Scrollbar(frame_lista, orient="vertical", command=tree_loot.yview)
 scrollbar.grid(row=0, column=1, sticky="ns")
 tree_loot.configure(yscrollcommand=scrollbar.set)
@@ -431,8 +963,8 @@ tree_loot.heading('nome_item', text='Nome Item', command=lambda: ordenar_coluna(
 tree_loot.heading('raridade', text='Raridade', command=lambda: ordenar_coluna(tree_loot, 'raridade', False))
 for raridade, cor in CORES_RARIDADE.items():
     tree_loot.tag_configure(raridade, foreground=cor)
-frame_formulario = ttk.LabelFrame(tab_manter_loot, text="Adicionar / Editar Item", padding=10)
-frame_formulario.grid(row=2, column=0, pady=10, padx=10, sticky="ew")
+frame_formulario = ttk.LabelFrame(tab_manter_loot, text="Adicionar / Editar Item", padding=8)
+frame_formulario.grid(row=2, column=0, pady=(3, 3), padx=10, sticky="ew")
 var_nome_item_crud = tk.StringVar()
 var_raridade_item_crud = tk.StringVar()
 ttk.Label(frame_formulario, text="Nome:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
@@ -444,44 +976,64 @@ combo_raridade_crud = ttk.Combobox(frame_formulario, textvariable=var_raridade_i
 combo_raridade_crud.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
 frame_formulario.columnconfigure(1, weight=1)
 frame_botoes_crud = ttk.Frame(tab_manter_loot, padding=5)
-frame_botoes_crud.grid(row=3, column=0, padx=5, sticky="ew")
+frame_botoes_crud.grid(row=3, column=0, padx=10, pady=(3, 3), sticky="ew")
 # ### MUDANÇA ### - O botão de limpar campos agora limpa a raridade também
 ttk.Button(frame_botoes_crud, text="Adicionar Novo", command=adicionar_item).pack(side=tk.LEFT, expand=True, fill='x', padx=5)
 ttk.Button(frame_botoes_crud, text="Salvar Edição", command=salvar_edicao_item).pack(side=tk.LEFT, expand=True, fill='x', padx=5)
 ttk.Button(frame_botoes_crud, text="Excluir Selecionado", command=excluir_item).pack(side=tk.LEFT, expand=True, fill='x', padx=5)
 ttk.Button(frame_botoes_crud, text="Limpar Campos", command=limpar_campos_crud).pack(side=tk.LEFT, expand=True, fill='x', padx=5)
 
+# Botão para carregar itens de exemplo
+frame_exemplo = ttk.Frame(tab_manter_loot, padding=5)
+frame_exemplo.grid(row=4, column=0, padx=5, sticky="ew")
+ttk.Button(frame_exemplo, text="🎲 Carregar Itens de Exemplo", command=carregar_itens_exemplo).pack(expand=True, fill='x')
+
 # --- Aba 3: Rolar Dados ---
 tab_dados = ttk.Frame(notebook)
 notebook.add(tab_dados, text='Rolar Dados')
+
+# Configurar expansão completa da aba - igual ao Gerador de Recompensas
+tab_dados.columnconfigure(0, weight=1)
+tab_dados.rowconfigure(0, weight=0)  # Quantidade de dados fixo
+tab_dados.rowconfigure(1, weight=0)  # Dados padrão fixo
+tab_dados.rowconfigure(2, weight=0)  # Dado custom fixo
+tab_dados.rowconfigure(3, weight=1)  # Resultados - usa toda a tela disponível
+
 var_quantidade_dados = tk.IntVar(value=1)
 var_lados_custom = tk.IntVar(value=6)
 frame_quantidade_dados = ttk.LabelFrame(tab_dados, text="1. Quantidade de Dados", padding=10)
-frame_quantidade_dados.pack(pady=10, padx=10, fill="x")
-ttk.Label(frame_quantidade_dados, text="Rodar:").pack(side=tk.LEFT, padx=(0,5))
+frame_quantidade_dados.grid(row=0, column=0, pady=(10, 10), padx=10, sticky="ew")
+ttk.Label(frame_quantidade_dados, text="Rodar:").pack(side=tk.LEFT, padx=(0, 8))
 ttk.Spinbox(frame_quantidade_dados, from_=1, to=100, textvariable=var_quantidade_dados, width=5).pack(side=tk.LEFT)
-ttk.Label(frame_quantidade_dados, text="dado(s)").pack(side=tk.LEFT, padx=(5,0))
+ttk.Label(frame_quantidade_dados, text="dado(s)").pack(side=tk.LEFT, padx=(8, 0))
+
 frame_dados_padrao = ttk.LabelFrame(tab_dados, text="2. Dados Padrão", padding=10)
-frame_dados_padrao.pack(pady=5, padx=10, fill="x")
+frame_dados_padrao.grid(row=1, column=0, pady=(0, 10), padx=10, sticky="ew")
 botoes_dados_info = [4, 6, 8, 10, 12, 20, 100]
 coluna_atual = 0
 for lados in botoes_dados_info:
     botao = ttk.Button(frame_dados_padrao, text=f"d{lados}", command=lambda l=lados: chamar_rolagem(l))
-    botao.grid(row=0, column=coluna_atual, padx=5, pady=5, sticky="ew")
+    botao.grid(row=0, column=coluna_atual, padx=8, pady=8, sticky="ew")
     frame_dados_padrao.columnconfigure(coluna_atual, weight=1)
     coluna_atual += 1
 frame_dado_custom = ttk.LabelFrame(tab_dados, text="3. Dado Personalizado (d?)", padding=10)
-frame_dado_custom.pack(pady=5, padx=10, fill="x")
-ttk.Label(frame_dado_custom, text="Lados:").pack(side=tk.LEFT, padx=(0,5))
+frame_dado_custom.grid(row=2, column=0, pady=(0, 10), padx=10, sticky="ew")
+ttk.Label(frame_dado_custom, text="Lados:").pack(side=tk.LEFT, padx=(0, 8))
 ttk.Spinbox(frame_dado_custom, from_=2, to=1000, textvariable=var_lados_custom, width=8).pack(side=tk.LEFT, expand=True, fill="x")
-ttk.Button(frame_dado_custom, text="Rolar!", command=lambda: chamar_rolagem(var_lados_custom.get())).pack(side=tk.LEFT, padx=(10,0))
+ttk.Button(frame_dado_custom, text="Rolar!", command=lambda: chamar_rolagem(var_lados_custom.get())).pack(side=tk.LEFT, padx=(15, 0))
+
 frame_resultado_dados = ttk.LabelFrame(tab_dados, text="Resultados", padding=10)
-frame_resultado_dados.pack(pady=10, padx=10, fill="both", expand=True)
+frame_resultado_dados.grid(row=3, column=0, pady=(0, 10), padx=10, sticky="nsew")
+
+# Configurar responsividade completa do frame de resultados - igual ao Gerador de Recompensas
+frame_resultado_dados.columnconfigure(0, weight=1)
+frame_resultado_dados.rowconfigure(1, weight=1)  # Text widget usa toda altura disponível
 frame_log_botoes = ttk.Frame(frame_resultado_dados)
-frame_log_botoes.pack(fill='x', pady=(0, 5))
+frame_log_botoes.grid(row=0, column=0, sticky="ew", pady=(0, 5))
 ttk.Button(frame_log_botoes, text="Limpar Log de Rolagens", command=limpar_log_rolagens).pack(side='right')
+
 resultado_dados_texto = tk.Text(frame_resultado_dados, height=10, wrap="word", relief="flat", borderwidth=0, font=("Segoe UI", 11))
-resultado_dados_texto.pack(fill="both", expand=True)
+resultado_dados_texto.grid(row=1, column=0, sticky="nsew")
 resultado_dados_texto.config(state=tk.DISABLED)
 
 # --- Finalização ---
@@ -491,8 +1043,43 @@ tree_loot.bind("<Delete>", on_delete_key)
 entry_nome_crud.bind("<Return>", on_enter_no_campo_nome)
 atualizar_treeview_loot()
 carregar_historico()
+
+# Salva os parâmetros no formato correto se necessário
+def verificar_e_atualizar_parametros():
+    try:
+        with open(obter_caminho('parametros.json'), 'r', encoding='utf-8') as f:
+            dados = json.load(f)
+        # Se não tem a estrutura nova, atualiza
+        if "pesos_raridade" not in dados:
+            salvar_parametros()
+    except:
+        # Se há erro ao ler, cria novo arquivo
+        salvar_parametros()
+
+verificar_e_atualizar_parametros()
+
 def ao_fechar():
     salvar_historico()
     janela.destroy()
+
 janela.protocol("WM_DELETE_WINDOW", ao_fechar)
+
+# FUNÇÃO FINAL: Mostrar janela apenas quando tudo estiver pronto
+def mostrar_janela():
+    try:
+        # Configurar tudo uma última vez
+        configurar_canvas()
+        # Centralizar janela na tela
+        janela.update_idletasks()
+        x = (janela.winfo_screenwidth() // 2) - (750 // 2)
+        y = (janela.winfo_screenheight() // 2) - (600 // 2)
+        janela.geometry(f"750x600+{x}+{y}")
+        # Mostrar janela
+        janela.deiconify()  # Mostra a janela
+    except:
+        janela.deiconify()  # Fallback - mostrar mesmo se há erro
+
+# Aguardar 300ms para tudo carregar, então mostrar
+janela.after(300, mostrar_janela)
+
 janela.mainloop()

@@ -1,10 +1,5 @@
-Log limpo em: 29/08/2025 00:00:37
-[29/08/2025 00:16] Rolando 1d6: [4] -> Total: 4
-[29/08/2025 00:16] Rolando 1d8: [5] -> Total: 5
-[29/08/2025 00:16] Rolando 1d10: [9] -> Total: 9
-[29/08/2025 00:16] Rolando 1d12: [9] -> Total: 9
-[29/08/2025 00:16] Rolando 1d12: [3] -> Total: 3
-[29/08/2025 00:16] Rolando 1d100: [20] -> Total: 20
-[29/08/2025 00:16] Rolando 1d20: [12] -> Total: 12
-[29/08/2025 00:16] Rolando 1d10: [5] -> Total: 5
-[29/08/2025 00:16] Rolando 1d4: [1] -> Total: 1
+Log limpo em: 31/08/2025 00:58:47
+[31/08/2025 01:09] Rolando 1d6: [1] -> Total: 1
+[31/08/2025 01:09] Rolando 1d6: [2] -> Total: 2
+[31/08/2025 01:09] Rolando 1d8: [3] -> Total: 3
+[31/08/2025 01:09] Rolando 1d8: [3] -> Total: 3
